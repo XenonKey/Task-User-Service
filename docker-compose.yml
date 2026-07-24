@@ -1,0 +1,121 @@
+services:
+  user-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: user_service
+      POSTGRES_PASSWORD: user_service
+      POSTGRES_DB: user_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_service -d user_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  task-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: task_service
+      POSTGRES_PASSWORD: task_service
+      POSTGRES_DB: task_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - task-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U task_service -d task_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=512M
+      - --overprovisioned
+      - --node-id=0
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+      - --pandaproxy-addr=0.0.0.0:8082
+      - --advertise-pandaproxy-addr=redpanda:8082
+    ports:
+      - "9092:9092"
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v2.7.2
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "8090:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  user-service:
+    build: ./services/user-service
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user_service:user_service@user-db:5432/user_db
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+    ports:
+      - "8001:8000"
+    depends_on:
+      user-db:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    volumes:
+      - user-service-keys:/app/app/keys
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  task-service:
+    build: ./services/task-service
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://task_service:task_service@task-db:5432/task_db
+      USER_SERVICE_JWKS_URL: http://user-service:8000/.well-known/jwks.json
+    ports:
+      - "8002:8000"
+    depends_on:
+      task-db:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  outbox-relay:
+    build: ./services/outbox-relay
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://task_service:task_service@task-db:5432/task_db
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+    depends_on:
+      task-db:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+volumes:
+  user-db-data:
+  task-db-data:
+  user-service-keys:
