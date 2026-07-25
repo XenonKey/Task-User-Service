@@ -4,6 +4,9 @@ __pycache__/
 venv/
 .env
 SECRETS.md
+CLAUDE.md
+.mcp.json
+.claude/
 *.pem
 .pytest_cache/
 .DS_Store
