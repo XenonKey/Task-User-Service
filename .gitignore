@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 venv/
 .env
+SECRETS.md
 *.pem
 .pytest_cache/
 .DS_Store

@@ -1,0 +1,40 @@
+services:
+  user-db:
+    ports:
+      - "5433:5432"
+
+  task-db:
+    ports:
+      - "5434:5432"
+
+  redpanda:
+    ports:
+      - "9092:9092"
+      - "8082:8082"
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v2.7.2
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "8090:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  user-service:
+    volumes:
+      - ./services/user-service:/app
+      - /app/.venv
+    command: sh -c "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  task-service:
+    volumes:
+      - ./services/task-service:/app
+      - /app/.venv
+    command: sh -c "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  outbox-relay:
+    volumes:
+      - ./services/outbox-relay:/app
+      - /app/.venv

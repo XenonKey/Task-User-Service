@@ -2,15 +2,13 @@ services:
   user-db:
     image: postgres:16
     environment:
-      POSTGRES_USER: user_service
-      POSTGRES_PASSWORD: user_service
-      POSTGRES_DB: user_db
-    ports:
-      - "5433:5432"
+      POSTGRES_USER: ${USER_DB_USER}
+      POSTGRES_PASSWORD: ${USER_DB_PASSWORD}
+      POSTGRES_DB: ${USER_DB_NAME}
     volumes:
       - user-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user_service -d user_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${USER_DB_USER} -d ${USER_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -18,15 +16,13 @@ services:
   task-db:
     image: postgres:16
     environment:
-      POSTGRES_USER: task_service
-      POSTGRES_PASSWORD: task_service
-      POSTGRES_DB: task_db
-    ports:
-      - "5434:5432"
+      POSTGRES_USER: ${TASK_DB_USER}
+      POSTGRES_PASSWORD: ${TASK_DB_PASSWORD}
+      POSTGRES_DB: ${TASK_DB_NAME}
     volumes:
       - task-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U task_service -d task_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${TASK_DB_USER} -d ${TASK_DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -44,33 +40,20 @@ services:
       - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
       - --pandaproxy-addr=0.0.0.0:8082
       - --advertise-pandaproxy-addr=redpanda:8082
-    ports:
-      - "9092:9092"
-      - "8082:8082"
     healthcheck:
       test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  redpanda-console:
-    image: docker.redpanda.com/redpandadata/console:v2.7.2
-    environment:
-      KAFKA_BROKERS: redpanda:9092
-    ports:
-      - "8090:8080"
-    depends_on:
-      redpanda:
-        condition: service_healthy
-
   user-service:
     build: ./services/user-service
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://user_service:user_service@user-db:5432/user_db
+      DATABASE_URL: postgresql+asyncpg://${USER_DB_USER}:${USER_DB_PASSWORD}@user-db:5432/${USER_DB_NAME}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     depends_on:
       user-db:
         condition: service_healthy
@@ -88,10 +71,10 @@ services:
     build: ./services/task-service
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://task_service:task_service@task-db:5432/task_db
+      DATABASE_URL: postgresql+asyncpg://${TASK_DB_USER}:${TASK_DB_PASSWORD}@task-db:5432/${TASK_DB_NAME}
       USER_SERVICE_JWKS_URL: http://user-service:8000/.well-known/jwks.json
     ports:
-      - "8002:8000"
+      - "127.0.0.1:8002:8000"
     depends_on:
       task-db:
         condition: service_healthy
@@ -107,7 +90,7 @@ services:
     build: ./services/outbox-relay
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://task_service:task_service@task-db:5432/task_db
+      DATABASE_URL: postgresql+asyncpg://${TASK_DB_USER}:${TASK_DB_PASSWORD}@task-db:5432/${TASK_DB_NAME}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
     depends_on:
       task-db:
