@@ -19,7 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     task_status = postgresql.ENUM(
-        "OPEN", "IN_PROGRESS", "DONE", "APPROVED", "REJECTED", name="task_status"
+        "OPEN", "IN_PROGRESS", "DONE", "APPROVED", "REJECTED", name="task_status", create_type=False
     )
     task_status.create(op.get_bind(), checkfirst=True)
 
