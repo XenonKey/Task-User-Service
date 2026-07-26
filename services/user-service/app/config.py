@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_minutes: int = 10080
     jwt_issuer: str = "user-service"
-    jwt_key_id: str = "user-service-key-1"
+    jwt_secret_key: str = "change-me-shared-jwt-secret"
 
     kafka_bootstrap_servers: str = "redpanda:9092"
     kafka_topic: str = "task-events"

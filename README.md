@@ -21,13 +21,13 @@ user-service          task-service           outbox-relay
         (идемпотентно через processed_events)
 ```
 
-- **user-service** — регистрация/логин, выпуск JWT (RS256), баланс
-  пользователя, JWKS-эндпоинт с публичным ключом, Kafka consumer,
-  начисляющий баланс по событию `task.completed`.
+- **user-service** — регистрация/логин, выпуск JWT (HS256, общий секрет
+  `JWT_SECRET_KEY`), баланс пользователя, Kafka consumer, начисляющий баланс
+  по событию `task.completed`.
 - **task-service** — задачи и их жизненный цикл (`OPEN -> IN_PROGRESS -> DONE
-  -> APPROVED/REJECTED`), локальная валидация JWT по ключу, полученному из
-  JWKS user-service при старте, запись в outbox в той же транзакции, что и
-  `approve`.
+  -> APPROVED/REJECTED`), локальная валидация JWT тем же общим секретом
+  `JWT_SECRET_KEY` (без похода в user-service на каждый запрос), запись в
+  outbox в той же транзакции, что и `approve`.
 - **outbox-relay** — отдельный процесс, каждые N секунд читает неотправленные
   строки `outbox` из `task_db`, публикует их в Kafka (`key = task_id`, чтобы
   сохранить порядок по задаче) и помечает `published_at`. At-least-once
@@ -37,8 +37,12 @@ user-service          task-service           outbox-relay
 ## Технологии
 
 Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 (async) + Alembic,
-PostgreSQL 16 (два инстанса), Kafka через Redpanda, JWT RS256, Docker Compose,
-pytest + httpx.
+PostgreSQL 16 (два инстанса), Kafka через Redpanda, JWT HS256 (общий секрет),
+Docker Compose, pytest + httpx.
+
+Подробное объяснение того, как устроена аутентификация/авторизация в этом
+проекте (хэширование паролей, JWT, HS256 vs RS256 и что вообще выбирают в
+индустрии) — см. [`AUTH.md`](./AUTH.md).
 
 ## Как поднять
 
@@ -58,7 +62,7 @@ Swagger UI:
 
 Redpanda Console (просмотр топика `task-events`): http://localhost:8090
 
-Остановить и убрать volume'ы (сброс баз данных и ключей):
+Остановить и убрать volume'ы (сброс баз данных):
 
 ```bash
 docker compose down -v
@@ -77,7 +81,8 @@ docker compose down -v
    заголовком `X-Admin-Secret: change-me-super-secret`:
    `{"email": "admin@example.com", "password": "pass1234"}`.
 3. **Логин** обоих — `POST /auth/login` для performer и для admin. Каждый
-   ответ содержит `access_token` (RS256 JWT с `sub`=user_id, `role`).
+   ответ содержит `access_token` (HS256 JWT с `sub`=user_id, `role`),
+   подписанный общим секретом `JWT_SECRET_KEY`, который знают оба сервиса.
    В Swagger UI task-service нажмите "Authorize" и вставьте
    `Bearer <access_token>` соответствующего пользователя перед вызовом
    защищённых эндпоинтов.

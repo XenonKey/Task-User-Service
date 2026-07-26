@@ -59,8 +59,6 @@ services:
         condition: service_healthy
       redpanda:
         condition: service_healthy
-    volumes:
-      - user-service-keys:/app/app/keys
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 5s
@@ -72,7 +70,6 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${TASK_DB_USER}:${TASK_DB_PASSWORD}@task-db:5432/${TASK_DB_NAME}
-      USER_SERVICE_JWKS_URL: http://user-service:8000/.well-known/jwks.json
     ports:
       - "127.0.0.1:8002:8000"
     depends_on:
@@ -101,4 +98,3 @@ services:
 volumes:
   user-db-data:
   task-db-data:
-  user-service-keys:
