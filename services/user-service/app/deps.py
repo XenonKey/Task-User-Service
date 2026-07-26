@@ -6,7 +6,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .config import settings
-from .security import PUBLIC_KEY
 
 bearer_scheme = HTTPBearer()
 
@@ -22,7 +21,7 @@ async def get_current_user(
 ) -> CurrentUser:
     try:
         payload = jwt.decode(
-            credentials.credentials, PUBLIC_KEY, algorithms=["RS256"], issuer=settings.jwt_issuer
+            credentials.credentials, settings.jwt_secret_key, algorithms=["HS256"], issuer=settings.jwt_issuer
         )
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")

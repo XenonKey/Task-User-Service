@@ -7,7 +7,6 @@ from fastapi import FastAPI
 
 from .kafka_consumer import consume_task_events
 from .routers import auth, users
-from .security import get_jwks
 
 logging.basicConfig(level=logging.INFO)
 
@@ -32,8 +31,3 @@ app.include_router(users.router)
 @app.get("/health", tags=["health"])
 async def health() -> dict:
     return {"status": "ok"}
-
-
-@app.get("/.well-known/jwks.json", tags=["auth"])
-async def jwks() -> dict:
-    return get_jwks()
