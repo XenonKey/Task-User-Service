@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://task_service:task_service@localhost:5434/task_db"
 
     jwt_issuer: str = "user-service"
-    jwt_secret_key: str = "change-me-shared-jwt-secret"
+    jwt_secret_key: str
 
 
 settings = Settings()

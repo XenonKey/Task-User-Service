@@ -12,9 +12,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/me", response_model=UserOut)
-async def read_me(
-    current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-) -> User:
+async def read_me(current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
     user = await db.get(User, current_user.id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
