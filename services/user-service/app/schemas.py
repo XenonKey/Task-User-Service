@@ -37,6 +37,15 @@ class TokenPair(BaseModel):
     token_type: str = "bearer"
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class AccessTokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 class BalanceOut(BaseModel):
     user_id: uuid.UUID
     balance: Decimal

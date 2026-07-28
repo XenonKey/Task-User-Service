@@ -1,3 +1,6 @@
+import uuid
+
+import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_db
 from app.models import User, UserRole
-from app.schemas import AdminRegister, TokenPair, UserLogin, UserOut, UserRegister
+from app.schemas import AccessTokenOut, AdminRegister, RefreshRequest, TokenPair, UserLogin, UserOut, UserRegister
 from app.security import create_access_token, create_refresh_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -47,3 +50,14 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)) -> TokenPai
         access_token=create_access_token(user.id, user.role.value),
         refresh_token=create_refresh_token(user.id, user.role.value),
     )
+
+
+@router.post("/refresh", response_model=AccessTokenOut)
+async def refresh(data: RefreshRequest) -> AccessTokenOut:
+    try:
+        payload = jwt.decode(data.refresh_token, settings.jwt_secret_key, algorithms=["HS256"], issuer=settings.jwt_issuer)
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+    return AccessTokenOut(access_token=create_access_token(uuid.UUID(payload["sub"]), payload["role"]))
