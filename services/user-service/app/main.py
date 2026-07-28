@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .kafka_consumer import consume_task_events
-from .routers import auth, users
+from app.kafka_consumer import consume_task_events
+from app.routers import auth, users
 
 logging.basicConfig(level=logging.INFO)
 

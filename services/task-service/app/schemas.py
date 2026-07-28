@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import TaskStatus
+from app.models import TaskStatus
 
 
 class TaskCreate(BaseModel):

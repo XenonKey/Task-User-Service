@@ -6,9 +6,9 @@ from aiokafka import AIOKafkaConsumer
 from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from .config import settings
-from .db import async_session_maker
-from .models import ProcessedEvent, User
+from app.config import settings
+from app.db import async_session_maker
+from app.models import ProcessedEvent, User
 
 logger = logging.getLogger(__name__)
 

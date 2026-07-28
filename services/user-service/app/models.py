@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .db import Base
+from app.db import Base
 
 
 class UserRole(str, enum.Enum):

@@ -6,9 +6,9 @@ from datetime import datetime, timezone
 from aiokafka import AIOKafkaProducer
 from sqlalchemy import select, update
 
-from .config import settings
-from .db import async_session_maker
-from .models import Outbox
+from app.config import settings
+from app.db import async_session_maker
+from app.models import Outbox
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

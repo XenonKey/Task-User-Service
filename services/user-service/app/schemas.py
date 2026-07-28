@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from .models import UserRole
+from app.models import UserRole
 
 
 class UserRegister(BaseModel):

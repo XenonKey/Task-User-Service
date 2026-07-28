@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI
 
-from .routers import tasks
+from app.routers import tasks
 
 logging.basicConfig(level=logging.INFO)
 
