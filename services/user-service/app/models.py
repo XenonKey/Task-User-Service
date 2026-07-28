@@ -22,9 +22,7 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[UserRole] = mapped_column(
-        PGEnum(UserRole, name="user_role"), default=UserRole.performer, nullable=False
-    )
+    role: Mapped[UserRole] = mapped_column(PGEnum(UserRole, name="user_role"), default=UserRole.performer, nullable=False)
     balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -21,9 +21,7 @@ async def read_me(current_user: CurrentUser = Depends(get_current_user), db: Asy
 
 @router.get("/{user_id}/balance", response_model=BalanceOut)
 async def read_balance(
-    user_id: uuid.UUID,
-    current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID, current_user: CurrentUser = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ) -> BalanceOut:
     if current_user.id != user_id and current_user.role != UserRole.admin.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")

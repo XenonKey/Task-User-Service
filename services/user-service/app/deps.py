@@ -16,13 +16,9 @@ class CurrentUser:
     role: str
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-) -> CurrentUser:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> CurrentUser:
     try:
-        payload = jwt.decode(
-            credentials.credentials, settings.jwt_secret_key, algorithms=["HS256"], issuer=settings.jwt_issuer
-        )
+        payload = jwt.decode(credentials.credentials, settings.jwt_secret_key, algorithms=["HS256"], issuer=settings.jwt_issuer)
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
     if payload.get("type") != "access":
