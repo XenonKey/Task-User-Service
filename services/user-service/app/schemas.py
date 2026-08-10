@@ -48,4 +48,5 @@ class AccessTokenOut(BaseModel):
 
 class BalanceOut(BaseModel):
     user_id: uuid.UUID
+    email: EmailStr
     balance: Decimal
