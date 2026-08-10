@@ -77,7 +77,7 @@ async def claim_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), cur
 async def complete_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> Task:
     stmt = (
         update(Task)
-        .where(Task.id == task_id, Task.status == TaskStatus.IN_PROGRESS, Task.performer_id == current_user.id)
+        .where(Task.id == task_id, Task.status.in_([TaskStatus.IN_PROGRESS, TaskStatus.REJECTED]), Task.performer_id == current_user.id)
         .values(status=TaskStatus.DONE, version=Task.version + 1)
         .returning(Task.id)
     )
@@ -94,8 +94,8 @@ async def complete_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), 
     return await _get_task_or_404(db, task_id)
 
 
-@router.get("/done", response_model=list[TaskOut], tags=["Admin"])
-async def get_done_tasks(db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(require_admin)) -> list[Task]:
+@router.get("/to_review", response_model=list[TaskOut], tags=["Admin"])
+async def get_to_review_tasks(db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(require_admin)) -> list[Task]:
     result = await db.execute(select(Task).where(Task.status == TaskStatus.DONE))
     tasks_done = result.scalars().all()
 
@@ -112,7 +112,8 @@ async def approve_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), _
     )
     result = await db.execute(stmt)
 
-    if result.first() is None:
+    row = result.first()
+    if row is None:
         await db.rollback()
         await _get_task_or_404(db, task_id)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task is not done")
@@ -120,11 +121,7 @@ async def approve_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), _
         Outbox(
             aggregate_id=row.id,
             event_type="task.completed",
-            payload={
-                "task_id": str(row.id),
-                "performer_id": str(row.performer_id),
-                "reward": str(row.reward),
-            },
+            payload={"task_id": str(row.id), "performer_id": str(row.performer_id), "reward": str(row.reward)},
         )
     )
     await db.commit()
