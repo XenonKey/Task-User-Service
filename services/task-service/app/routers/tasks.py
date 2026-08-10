@@ -10,7 +10,7 @@ from app.db import get_db
 from app.models import Outbox, Task, TaskStatus
 from app.schemas import TaskCreate, TaskOut
 
-router = APIRouter(prefix="/tasks", tags=["tasks"])
+router = APIRouter(prefix="/tasks")
 
 
 async def _get_task_or_404(db: AsyncSession, task_id: uuid.UUID) -> Task:
@@ -20,7 +20,7 @@ async def _get_task_or_404(db: AsyncSession, task_id: uuid.UUID) -> Task:
     return task
 
 
-@router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED, tags=["Admin"])
 async def create_task(data: TaskCreate, db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(require_admin)) -> Task:
     task = Task(title=data.title, description=data.description, reward=data.reward)
     db.add(task)
@@ -33,7 +33,7 @@ async def create_task(data: TaskCreate, db: AsyncSession = Depends(get_db), _: C
     return task
 
 
-@router.get("", response_model=list[TaskOut])
+@router.get("", response_model=list[TaskOut], tags=["Performer"])
 async def list_tasks(
     status_filter: TaskStatus | None = Query(default=None), db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(get_current_user)
 ) -> list[Task]:
@@ -44,7 +44,7 @@ async def list_tasks(
     return list(result.scalars().all())
 
 
-@router.get("/my", response_model=list[TaskOut])
+@router.get("/my", response_model=list[TaskOut], tags=["Performer"])
 async def my_list_tasks(db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> list[Task]:
 
     stmt = select(Task).where(Task.performer_id == current_user.id).order_by(Task.updated_at.desc())
@@ -52,7 +52,7 @@ async def my_list_tasks(db: AsyncSession = Depends(get_db), current_user: Curren
     return list(result.scalars().all())
 
 
-@router.post("/{task_id}/claim", response_model=TaskOut)
+@router.post("/{task_id}/claim", response_model=TaskOut, tags=["Performer"])
 async def claim_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> Task:
     stmt = (
         update(Task)
@@ -73,50 +73,77 @@ async def claim_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), cur
     return await _get_task_or_404(db, task_id)
 
 
-@router.post("/{task_id}/complete", response_model=TaskOut)
+@router.post("/{task_id}/complete", response_model=TaskOut, tags=["Performer"])
 async def complete_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> Task:
-    task = await _get_task_or_404(db, task_id)
-    if task.performer_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your task")
-    if task.status != TaskStatus.IN_PROGRESS:
+    stmt = (
+        update(Task)
+        .where(Task.id == task_id, Task.status == TaskStatus.IN_PROGRESS, Task.performer_id == current_user.id)
+        .values(status=TaskStatus.DONE, version=Task.version + 1)
+        .returning(Task.id)
+    )
+    result = await db.execute(stmt)
+
+    completed = result.first() is not None
+    if not completed:
+        await db.rollback()
+        existing = await _get_task_or_404(db, task_id)
+        if existing.performer_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your task")
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task is not in progress")
-    task.status = TaskStatus.DONE
-    task.version += 1
     await db.commit()
-    await db.refresh(task)
-    return task
+    return await _get_task_or_404(db, task_id)
 
 
-@router.post("/{task_id}/approve", response_model=TaskOut)
+@router.get("/done", response_model=list[TaskOut], tags=["Admin"])
+async def get_done_tasks(db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(require_admin)) -> list[Task]:
+    result = await db.execute(select(Task).where(Task.status == TaskStatus.DONE))
+    tasks_done = result.scalars().all()
+
+    return tasks_done
+
+
+@router.post("/{task_id}/approve", response_model=TaskOut, tags=["Admin"])
 async def approve_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(require_admin)) -> Task:
-    task = await _get_task_or_404(db, task_id)
-    if task.status != TaskStatus.DONE:
+    stmt = (
+        update(Task)
+        .where(Task.id == task_id, Task.status == TaskStatus.DONE)
+        .values(status=TaskStatus.APPROVED, version=Task.version + 1)
+        .returning(Task.id, Task.performer_id, Task.reward)
+    )
+    result = await db.execute(stmt)
+
+    if result.first() is None:
+        await db.rollback()
+        await _get_task_or_404(db, task_id)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task is not done")
-    task.status = TaskStatus.APPROVED
-    task.version += 1
     db.add(
         Outbox(
-            aggregate_id=task.id,
+            aggregate_id=row.id,
             event_type="task.completed",
             payload={
-                "task_id": str(task.id),
-                "performer_id": str(task.performer_id),
-                "reward": str(task.reward),
+                "task_id": str(row.id),
+                "performer_id": str(row.performer_id),
+                "reward": str(row.reward),
             },
         )
     )
     await db.commit()
-    await db.refresh(task)
-    return task
+    return await _get_task_or_404(db, task_id)
 
 
-@router.post("/{task_id}/reject", response_model=TaskOut)
+@router.post("/{task_id}/reject", response_model=TaskOut, tags=["Admin"])
 async def reject_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(require_admin)) -> Task:
-    task = await _get_task_or_404(db, task_id)
-    if task.status != TaskStatus.DONE:
+    stmt = (
+        update(Task)
+        .where(Task.id == task_id, Task.status == TaskStatus.DONE)
+        .values(status=TaskStatus.REJECTED, version=Task.version + 1)
+        .returning(Task.id)
+    )
+    result = await db.execute(stmt)
+
+    if result.first() is None:
+        await db.rollback()
+        await _get_task_or_404(db, task_id)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task is not done")
-    task.status = TaskStatus.REJECTED
-    task.version += 1
     await db.commit()
-    await db.refresh(task)
-    return task
+    return await _get_task_or_404(db, task_id)
