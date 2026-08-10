@@ -28,24 +28,15 @@ def serialize_event(row: Outbox) -> bytes:
 async def _publish_batch(producer: AIOKafkaProducer) -> int:
     async with async_session_maker() as session:
         result = await session.execute(
-            select(Outbox)
-            .where(Outbox.published_at.is_(None))
-            .order_by(Outbox.created_at)
-            .limit(settings.outbox_batch_size)
+            select(Outbox).where(Outbox.published_at.is_(None)).order_by(Outbox.created_at).limit(settings.outbox_batch_size)
         )
         rows = result.scalars().all()
 
         published = 0
         for row in rows:
             try:
-                await producer.send_and_wait(
-                    settings.kafka_topic,
-                    key=str(row.aggregate_id).encode("utf-8"),
-                    value=serialize_event(row),
-                )
-                await session.execute(
-                    update(Outbox).where(Outbox.id == row.id).values(published_at=datetime.now(timezone.utc))
-                )
+                await producer.send_and_wait(settings.kafka_topic, key=str(row.aggregate_id).encode("utf-8"), value=serialize_event(row))
+                await session.execute(update(Outbox).where(Outbox.id == row.id).values(published_at=datetime.now(timezone.utc)))
                 await session.commit()
                 published += 1
             except Exception:
