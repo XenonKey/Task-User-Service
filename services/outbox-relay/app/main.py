@@ -48,11 +48,9 @@ async def _publish_batch(producer: AIOKafkaProducer) -> int:
 async def run() -> None:
     producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers, acks="all")
     await producer.start()
-    logger.info(
-        "Outbox relay started, polling every %.1fs (topic=%s)",
-        settings.outbox_poll_interval_seconds,
-        settings.kafka_topic,
-    )
+
+    logger.info("Outbox relay started, polling every %.1fs (topic=%s)", settings.outbox_poll_interval_seconds, settings.kafka_topic)
+
     try:
         while True:
             try:
