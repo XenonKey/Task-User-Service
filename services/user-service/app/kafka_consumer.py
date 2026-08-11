@@ -1,6 +1,7 @@
 import json
 import logging
 import uuid
+from decimal import Decimal
 
 from aiokafka import AIOKafkaConsumer
 from sqlalchemy import update
@@ -17,7 +18,7 @@ async def _handle_task_completed(event: dict) -> None:
     event_id = uuid.UUID(event["event_id"])
     payload = event["payload"]
     performer_id = uuid.UUID(payload["performer_id"])
-    reward = payload["reward"]
+    reward = Decimal(payload["reward"])
 
     async with async_session_maker() as session:
         async with session.begin():
@@ -26,9 +27,7 @@ async def _handle_task_completed(event: dict) -> None:
             if result.rowcount == 0:
                 logger.info("Event %s already processed, skipping", event_id)
                 return
-            await session.execute(
-                update(User).where(User.id == performer_id).values(balance=User.balance + reward)
-            )
+            await session.execute(update(User).where(User.id == performer_id).values(balance=User.balance + reward))
     logger.info("Applied reward %s to user %s for event %s", reward, performer_id, event_id)
 
 
