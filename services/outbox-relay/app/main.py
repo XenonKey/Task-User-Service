@@ -27,9 +27,7 @@ def serialize_event(row: Outbox) -> bytes:
 
 async def _publish_batch(producer: AIOKafkaProducer) -> int:
     async with async_session_maker() as session:
-        result = await session.execute(
-            select(Outbox).where(Outbox.published_at.is_(None)).order_by(Outbox.created_at).limit(settings.outbox_batch_size)
-        )
+        result = await session.execute(select(Outbox).where(Outbox.published_at.is_(None)).order_by(Outbox.created_at).limit(settings.outbox_batch_size))
         rows = result.scalars().all()
 
         published = 0

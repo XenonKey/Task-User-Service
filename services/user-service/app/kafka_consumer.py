@@ -8,7 +8,7 @@ from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.config import settings
-from app.db import async_session_maker
+from app.db import engine
 from app.models import ProcessedEvent, User
 
 logger = logging.getLogger(__name__)
@@ -20,14 +20,13 @@ async def _handle_task_completed(event: dict) -> None:
     performer_id = uuid.UUID(payload["performer_id"])
     reward = Decimal(payload["reward"])
 
-    async with async_session_maker() as session:
-        async with session.begin():
-            insert_stmt = pg_insert(ProcessedEvent).values(event_id=event_id).on_conflict_do_nothing()
-            result = await session.execute(insert_stmt)
-            if result.rowcount == 0:
-                logger.info("Event %s already processed, skipping", event_id)
-                return
-            await session.execute(update(User).where(User.id == performer_id).values(balance=User.balance + reward))
+    async with engine.begin() as conn:
+        insert_stmt = pg_insert(ProcessedEvent).values(event_id=event_id).on_conflict_do_nothing()
+        result = await conn.execute(insert_stmt)
+        if result.rowcount == 0:
+            logger.info("Event %s already processed, skipping", event_id)
+            return
+        await conn.execute(update(User).where(User.id == performer_id).values(balance=User.balance + reward))
     logger.info("Applied reward %s to user %s for event %s", reward, performer_id, event_id)
 
 

@@ -34,9 +34,7 @@ async def create_task(data: TaskCreate, db: AsyncSession = Depends(get_db), _: C
 
 
 @router.get("", response_model=list[TaskOut], tags=["Performer"])
-async def list_tasks(
-    status_filter: TaskStatus | None = Query(default=None), db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(get_current_user)
-) -> list[Task]:
+async def list_tasks(status_filter: TaskStatus | None = Query(default=None), db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(get_current_user)) -> list[Task]:
     stmt = select(Task).order_by(Task.created_at.desc())
     if status_filter is not None:
         stmt = stmt.where(Task.status == status_filter)
@@ -45,9 +43,15 @@ async def list_tasks(
 
 
 @router.get("/my", response_model=list[TaskOut], tags=["Performer"])
-async def my_list_tasks(db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> list[Task]:
+async def my_list_tasks(
+    status_filter: TaskStatus | None = Query(default=None), db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)
+) -> list[Task]:
 
     stmt = select(Task).where(Task.performer_id == current_user.id).order_by(Task.updated_at.desc())
+
+    if status_filter is not None:
+        stmt = stmt.where(Task.status == status_filter)
+
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
@@ -117,6 +121,7 @@ async def approve_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), _
         await db.rollback()
         await _get_task_or_404(db, task_id)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task is not done")
+
     db.add(
         Outbox(
             aggregate_id=row.id,
@@ -130,15 +135,12 @@ async def approve_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), _
 
 @router.post("/{task_id}/reject", response_model=TaskOut, tags=["Admin"])
 async def reject_task(task_id: uuid.UUID, db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(require_admin)) -> Task:
-    stmt = (
-        update(Task)
-        .where(Task.id == task_id, Task.status == TaskStatus.DONE)
-        .values(status=TaskStatus.REJECTED, version=Task.version + 1)
-        .returning(Task.id)
-    )
+    stmt = update(Task).where(Task.id == task_id, Task.status == TaskStatus.DONE).values(status=TaskStatus.REJECTED, version=Task.version + 1).returning(Task.id)
     result = await db.execute(stmt)
 
-    if result.first() is None:
+    rejected = result.first() is not None
+
+    if not rejected:
         await db.rollback()
         await _get_task_or_404(db, task_id)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task is not done")

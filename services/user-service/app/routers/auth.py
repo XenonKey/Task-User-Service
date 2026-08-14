@@ -31,11 +31,7 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)) -> Us
 
 
 @router.post("/admin/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register_admin(
-    data: AdminRegister,
-    db: AsyncSession = Depends(get_db),
-    x_admin_secret: str | None = Header(default=None),
-) -> User:
+async def register_admin(data: AdminRegister, db: AsyncSession = Depends(get_db), x_admin_secret: str | None = Header(default=None)) -> User:
     if x_admin_secret != settings.admin_bootstrap_secret:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin bootstrap secret")
     return await _create_user(db, data.email, data.password, UserRole.admin)
