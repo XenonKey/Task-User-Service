@@ -1,6 +1,7 @@
 services:
   user-db:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${USER_DB_USER}
       POSTGRES_PASSWORD: ${USER_DB_PASSWORD}
@@ -15,6 +16,7 @@ services:
 
   task-db:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${TASK_DB_USER}
       POSTGRES_PASSWORD: ${TASK_DB_PASSWORD}
@@ -29,6 +31,7 @@ services:
 
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
+    restart: unless-stopped
     command:
       - redpanda
       - start
@@ -48,6 +51,7 @@ services:
 
   user-service:
     build: ./services/user-service
+    restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${USER_DB_USER}:${USER_DB_PASSWORD}@user-db:5432/${USER_DB_NAME}
@@ -67,6 +71,7 @@ services:
 
   task-service:
     build: ./services/task-service
+    restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${TASK_DB_USER}:${TASK_DB_PASSWORD}@task-db:5432/${TASK_DB_NAME}
@@ -85,6 +90,7 @@ services:
 
   outbox-relay:
     build: ./services/outbox-relay
+    restart: unless-stopped
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${TASK_DB_USER}:${TASK_DB_PASSWORD}@task-db:5432/${TASK_DB_NAME}
