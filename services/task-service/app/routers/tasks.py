@@ -34,8 +34,14 @@ async def create_task(data: TaskCreate, db: AsyncSession = Depends(get_db), _: C
 
 
 @router.get("", response_model=list[TaskOut], tags=["Performer"])
-async def list_tasks(status_filter: TaskStatus | None = Query(default=None), db: AsyncSession = Depends(get_db), _: CurrentUser = Depends(get_current_user)) -> list[Task]:
-    stmt = select(Task).order_by(Task.created_at.desc())
+async def list_tasks(
+    status_filter: TaskStatus | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _: CurrentUser = Depends(get_current_user),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> list[Task]:
+
+    stmt = select(Task).order_by(Task.created_at.desc()).limit(limit)
     if status_filter is not None:
         stmt = stmt.where(Task.status == status_filter)
     result = await db.execute(stmt)
@@ -44,10 +50,13 @@ async def list_tasks(status_filter: TaskStatus | None = Query(default=None), db:
 
 @router.get("/my", response_model=list[TaskOut], tags=["Performer"])
 async def my_list_tasks(
-    status_filter: TaskStatus | None = Query(default=None), db: AsyncSession = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)
+    status_filter: TaskStatus | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+    limit: int = Query(default=20, ge=1, le=100),
 ) -> list[Task]:
 
-    stmt = select(Task).where(Task.performer_id == current_user.id).order_by(Task.updated_at.desc())
+    stmt = select(Task).where(Task.performer_id == current_user.id).order_by(Task.updated_at.desc()).limit(limit)
 
     if status_filter is not None:
         stmt = stmt.where(Task.status == status_filter)

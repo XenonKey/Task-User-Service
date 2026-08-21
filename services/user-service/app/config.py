@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://user_service:user_service@localhost:5433/user_db"
     admin_bootstrap_secret: str
 
-    access_token_expire_minutes: int = 15
+    access_token_expire_minutes: int = 60
     refresh_token_expire_minutes: int = 10080
     jwt_issuer: str = "user-service"
     jwt_secret_key: str
